@@ -13,24 +13,43 @@
       let
         pkgs = import nixpkgs { inherit system; };
 
-        # PostgreSQL helper scripts
-        pgScripts = pkgs.writeShellScriptBin "pg-helpers" ''
-          export PGDATA="$PWD/.postgres"
-          export PGHOST="$PWD/.postgres"
-        '';
+        # Project configuration
+        projectName = "gator";
+        dbName = projectName;
+        pgDataDir = ".postgres";
+        migrationsDir = "./sql/schema";
 
+        # PostgreSQL helper scripts
         pgstart = pkgs.writeShellScriptBin "pgstart" ''
-          source ${pgScripts}/bin/pg-helpers
+          # Initialise PostgreSQL if needed
+          if [ ! -d "$PGDATA" ]; then
+            echo "Initialising PostgreSQL..."
+            initdb --auth=trust --no-locale --encoding=UTF8
+          fi
+
           if pg_ctl status >/dev/null 2>&1; then
             echo "PostgreSQL is already running"
           else
             pg_ctl -o "-k $PGHOST" -l "$PGDATA/logfile" start
+            
+            # Wait for PostgreSQL to be ready
+            for i in {1..10}; do
+              if pg_isready -h "$PGHOST" >/dev/null 2>&1; then
+                break
+              fi
+              sleep 0.5
+            done
+            
+            # Auto-create database if it doesn't exist
+            if ! psql -lqt | cut -d \| -f 1 | grep -qw ${dbName} 2>/dev/null; then
+              createdb ${dbName} && echo "Created database: ${dbName}"
+            fi
+            
             echo "PostgreSQL started"
           fi
         '';
 
         pgstop = pkgs.writeShellScriptBin "pgstop" ''
-          source ${pgScripts}/bin/pg-helpers
           if pg_ctl status >/dev/null 2>&1; then
             pg_ctl stop -m fast
             echo "PostgreSQL stopped"
@@ -40,12 +59,10 @@
         '';
 
         pgstatus = pkgs.writeShellScriptBin "pgstatus" ''
-          source ${pgScripts}/bin/pg-helpers
           pg_ctl status
         '';
 
         pglogs = pkgs.writeShellScriptBin "pglogs" ''
-          source ${pgScripts}/bin/pg-helpers
           tail -f "$PGDATA/logfile"
         '';
 
@@ -71,22 +88,21 @@
           ];
 
           shellHook = ''
-            export PGDATA="$PWD/.postgres"
-            export PGHOST="$PWD/.postgres"
-            export PGDATABASE="gator"
+            export PGDATA="$PWD/${pgDataDir}"
+            export PGHOST="$PGDATA"
+            export PGDATABASE="${dbName}"
             export DATABASE_URL="postgres:///$PGDATABASE?host=$PGHOST"
 
-            # Initialise PostgreSQL if needed
-            if [ ! -d "$PGDATA" ]; then
-              echo "Initialising PostgreSQL..."
-              initdb --auth=trust --no-locale --encoding=UTF8 >/dev/null
-            fi
+            # Goose environment variables
+            export GOOSE_DRIVER="postgres"
+            export GOOSE_DBSTRING="$DATABASE_URL"
+            export GOOSE_MIGRATION_DIR="${migrationsDir}"
 
             # Check if PostgreSQL is running
             if pg_ctl status >/dev/null 2>&1; then
-              echo "✓ gator dev environment ready (PostgreSQL running)"
+              echo "✓ ${projectName} dev environment ready (PostgreSQL running)"
             else
-              echo "✓ gator dev environment ready"
+              echo "✓ ${projectName} dev environment ready"
               echo "  Run 'pgstart' to start PostgreSQL"
             fi
 
