@@ -19,8 +19,9 @@ func main() {
 	pgrmState := &state{cfg: &cfg}
 	cmds := commands{cliCommands: map[string]func(*state, command) error{}}
 
+	err = cmds.register("login", handlerLogin)
 	if err != nil {
-		log.Fatalf("Config file set user error: %v\n", err)
+		log.Fatalf("Failed to register command: %v\n", err)
 	}
 
 	args := os.Args
