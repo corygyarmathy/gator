@@ -67,6 +67,18 @@ func handlerRegister(s *state, cmd command) error {
 	return nil
 }
 
+func handlerReset(s *state, cmd command) error {
+	if len(cmd.Args) != 0 {
+		return fmt.Errorf("usage: %v", cmd.Name)
+	}
+
+	err := s.db.ResetUsers(context.Background())
+	if err != nil {
+		return fmt.Errorf("resetting users table: %v", err)
+	}
+	return nil
+}
+
 func printUser(user database.User) {
 	fmt.Printf(" * ID:      %v\n", user.ID)
 	fmt.Printf(" * Name:    %v\n", user.Name)
