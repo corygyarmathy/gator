@@ -79,6 +79,7 @@
             # Database
             postgresql
             goose
+            sqlc
 
             # PostgreSQL helpers
             pgstart
