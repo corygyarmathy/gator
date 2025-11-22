@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -12,16 +13,26 @@ import (
 )
 
 func handlerLogin(s *state, cmd command) error {
-	if len(cmd.Args) == 0 {
-		return fmt.Errorf("login args empty")
+	if len(cmd.Args) != 1 {
+		return fmt.Errorf("usage: %v <name>", cmd.Name)
 	}
 
-	if len(cmd.Args) > 1 {
-		return fmt.Errorf("login expects 1 arg, received more")
+	name := cmd.Args[0]
+
+	user, err := s.db.GetUser(context.Background(), name)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("user '%v' does not exist in db", name)
+		}
+		return fmt.Errorf("getting user: %v", err)
 	}
 
-	s.cfg.CurrentUserName = cmd.Args[0]
-	fmt.Printf("Username has been set: %v", s.cfg.CurrentUserName)
+	err = s.cfg.SetUser(user.Name)
+	if err != nil {
+		return fmt.Errorf("setting username: %v", err)
+	}
+
+	fmt.Printf("Username has been set: %v\n", s.cfg.CurrentUserName)
 
 	return nil
 }
