@@ -4,16 +4,20 @@ import (
 	"database/sql"
 	"log"
 	"os"
+	"time"
 
+	"github.com/corygyarmathy/gator/internal/cachegator"
 	"github.com/corygyarmathy/gator/internal/config"
 	"github.com/corygyarmathy/gator/internal/database"
+	"github.com/corygyarmathy/gator/internal/rssgator"
 
 	_ "github.com/lib/pq"
 )
 
 type state struct {
-	cfg *config.Config
-	db  *database.Queries
+	cfg       *config.Config
+	db        *database.Queries
+	apiClient *rssgator.Client
 }
 
 func main() {
@@ -33,7 +37,12 @@ func main() {
 	}()
 	dbQueries := database.New(db)
 
-	pgrmState := &state{cfg: &cfg, db: dbQueries}
+	c := cachegator.NewCache(5 * time.Minute)
+	defer c.Close()
+
+	client := rssgator.NewClient(5*time.Second, c)
+
+	pgrmState := &state{cfg: &cfg, db: dbQueries, apiClient: client}
 	cmds := commands{cliCommands: map[string]func(*state, command) error{}}
 
 	err = cmds.register("login", handlerLogin)
