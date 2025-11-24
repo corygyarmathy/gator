@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -65,7 +67,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to register command: %v\n", err)
 	}
-	err = cmds.register("addfeed", handlerAddFeed)
+	err = cmds.register("addfeed", withLoggedInUser(handlerAddFeed))
 	if err != nil {
 		log.Fatalf("Failed to register command: %v\n", err)
 	}
@@ -73,11 +75,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to register command: %v\n", err)
 	}
-	err = cmds.register("follow", handlerFollow)
+	err = cmds.register("follow", withLoggedInUser(handlerFollow))
 	if err != nil {
 		log.Fatalf("Failed to register command: %v\n", err)
 	}
-	err = cmds.register("following", handlerFollowing)
+	err = cmds.register("following", withLoggedInUser(handlerFollowing))
 	if err != nil {
 		log.Fatalf("Failed to register command: %v\n", err)
 	}
@@ -93,5 +95,19 @@ func main() {
 	err = cmds.run(pgrmState, cmd)
 	if err != nil {
 		log.Fatalf("Command run error: %v\n", err)
+	}
+}
+
+func withLoggedInUser(handler func(s *state, cmd command, user database.User) error) func(*state, command) error {
+	return func(s *state, cmd command) error {
+		name := s.cfg.CurrentUserName
+		user, err := s.db.GetUser(context.Background(), name)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return fmt.Errorf("getting user: user '%v' does not exist in db", name)
+			}
+			return fmt.Errorf("getting user: %v", err)
+		}
+		return handler(s, cmd, user)
 	}
 }
