@@ -73,6 +73,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to register command: %v\n", err)
 	}
+	err = cmds.register("follow", handlerFollow)
+	if err != nil {
+		log.Fatalf("Failed to register command: %v\n", err)
+	}
+	err = cmds.register("following", handlerFollowing)
+	if err != nil {
+		log.Fatalf("Failed to register command: %v\n", err)
+	}
 
 	args := os.Args
 	if len(args) < 2 {
